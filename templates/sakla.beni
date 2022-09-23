@@ -1,0 +1,33 @@
+
+<!doctype html>
+<html lang="eng">
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0,
+    maximum-scale=1.0, minimum-scale=1.0">
+    <title>SecurXFer v0.1 </title>
+
+</head>
+
+<body>
+
+<h1>SecurXFer / HTTP UI Edition v0.1</h1>
+
+<form action="/process" method="POST">
+    <label for="msg">Your Message</label>
+    <input type="text" name="message" id="msg" placeholder="Your Message">
+
+    <label for="prt">Your Comm Port</label>
+    <input type="text" name="proto" id="prt" value="tcp" placeholder="Your Comm Port">
+
+    <input type="submit" value="GÖNDER">
+</form>
+
+<h1>SecurXFer</h1>
+
+<h3>{{.Message}}</h3>
+
+</body>
+
+</html>

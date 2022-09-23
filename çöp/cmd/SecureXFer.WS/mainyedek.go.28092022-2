@@ -1,0 +1,107 @@
+package main
+
+import (
+	"github.com/gorilla/websocket"
+	"log"
+	"net/http"
+	"sync"
+	"text/template"
+)
+
+const (
+	IEEE = 0xedb88320 //CRC-32
+	// Castagnoli's polynomial, used in iSCSI.
+	// Has better error detection characteristics than IEEE.
+	// https://dx.doi.org/10.1109/26.231911
+	// Castagnoli = 0x82f63b78
+	// Koopman's polynomial.
+	// Also has better error detection characteristics than IEEE.
+	// https://dx.doi.org/10.1109/DSN.2002.1028931
+	// Koopman = 0xeb31d82e
+)
+
+var (
+	cipherKey256 = []byte("_08_bit__16_bit__24_bit__32_bit_") //32-bit key for AES-256
+	// cipherKey192 = []byte("_08_bit__16_bit__24_bit_") //24-bit key for AES-192
+	//cipherKey128 = []byte("_08_bit__16_bit_") //16-bit key for AES-128
+
+	upgrader = &websocket.Upgrader{ReadBufferSize: 1024, WriteBufferSize: 1024}
+
+	//	temps  *template.Template
+	//	Harici = []byte("Hariciye")
+
+)
+
+func checkError(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func homeHandler(templateX *template.Template) http.Handler {
+	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		err := templateX.Execute(writer, request)
+		checkError(err)
+	})
+}
+
+type wsHandler struct {
+	transferX *transX // h *hub
+}
+
+func (wsHandle wsHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	upgrader.CheckOrigin = func(request *http.Request) bool { return true }
+	wsConn, err := upgrader.Upgrade(writer, request, nil)
+	if err != nil {
+		log.Printf("error upgrading %s", err)
+		return
+	}
+	defer wsConn.Close()
+
+	/*
+		c := &connection{send: make(chan []byte, 256), h: wsh.h}
+		c.h.addConnection(c)
+		defer c.h.removeConnection(c)
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go c.writer(&wg, wsConn)
+		go c.reader(&wg, wsConn)
+		wg.Wait()
+
+
+	*/
+}
+
+type transX struct {
+	// the mutex to protect connections
+	connectionsMx sync.RWMutex
+
+	// Registered connections.
+	// connections           map[*connection]struct{}
+	// connectionsFromServer map[*connectionFromServer]struct{}
+
+	// Inbound messages from the connections.
+	broadcast chan []byte
+
+	// Inbound msg from server
+
+	broadcastServer chan []byte
+
+	logMx sync.RWMutex
+	log   [][]byte
+}
+
+func main() {
+
+	// sil bunu... fmt.Println("walla: ", bytes.Count([]byte("cheese"), []byte("e")))
+
+	templateX := template.Must(template.ParseFiles("index.html"))
+
+	var h2sil *transX
+
+	router := http.NewServeMux()
+
+	router.Handle("/", homeHandler(templateX))
+	router.Handle("/ws", wsHandler{transferX: h2sil})
+
+}

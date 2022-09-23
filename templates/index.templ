@@ -18,15 +18,13 @@
     <label for="msg">Your Message</label>
     <input type="text" name="message" id="msg" placeholder="Your Message">
 
-    <label for="prt">Your Comm Port</label>
-    <input type="text" name="proto" id="prt" value="tcp" placeholder="Your Comm Port">
-
     <input type="submit" value="GÖNDER BE!">
 </form>
 
 <h1>SecurXFer</h1>
 
-<h3>{{.MessageRX}}</h3>
+<h3>Gelen Mesaj: {{.MessageRX}}</h3>
+<h3>Giden Mesaj: {{.MessageTX}}</h3>
 
 </body>
 

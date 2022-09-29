@@ -50,7 +50,7 @@ var (
 	//cipherKey192 = []byte("_08_bit__16_bit__24_bit_") //24-bit key for AES-192
 	//cipherKey128 = []byte("_08_bit__16_bit_") //16-bit key for AES-128
 	temps  *template.Template
-	Harici string = "Harici"
+	Harici = "Harici"
 
 	// gelenMesajKanal = &DataPasser{msgX: make(chan string)}
 
@@ -61,7 +61,7 @@ var (
 
 func init() {
 
-	temps = template.Must(template.ParseGlob("./../../templates/*.templ"))
+	temps = template.Must(template.ParseGlob("./tmpl/*.templ"))
 
 }
 
@@ -344,9 +344,9 @@ func checkError(err error) {
 	}
 }
 
-type DataPasser struct {
-	msgX chan string
-}
+// type DataPasser struct {
+// 	 msgX chan string
+// }
 
 func index(w http.ResponseWriter, r *http.Request) {
 
@@ -361,7 +361,10 @@ func index(w http.ResponseWriter, r *http.Request) {
 		MessageRX: Harici,
 		MessageTX: message2Send,
 	}
-	temps.ExecuteTemplate(w, "index.templ", d)
+	err := temps.ExecuteTemplate(w, "index.templ", d)
+	if err != nil {
+		return
+	}
 
 	// Harici = <-gelenMesajKanal.msgX
 
@@ -384,7 +387,10 @@ func main() {
 		http.HandleFunc("/", index)
 		// http.HandleFunc("/", processor)
 		// Harici = <-gelenMesajKanal
-		http.ListenAndServe(":8888", nil)
+		err := http.ListenAndServe(":8888", nil)
+		if err != nil {
+			return
+		}
 	}()
 
 	for {

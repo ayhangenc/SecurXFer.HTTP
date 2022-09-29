@@ -1,0 +1,31 @@
+
+<!doctype html>
+<html lang="eng">
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0,
+    maximum-scale=1.0, minimum-scale=1.0">
+    <title>SecurXFer v0.1 </title>
+
+</head>
+
+<body>
+
+<h1>SecurXFer / HTTP UI Edition v0.1</h1>
+
+<form action="/process" method="POST">
+    <label for="msg">Your Message</label>
+    <input type="text" name="message" id="msg" placeholder="Your Message">
+
+    <input type="submit" value="GÖNDER BE!">
+</form>
+
+<h1>SecurXFer</h1>
+
+<h3>Gelen Mesaj: {{.MessageRX}}</h3>
+<h3>Giden Mesaj: {{.MessageTX}}</h3>
+
+</body>
+
+</html>

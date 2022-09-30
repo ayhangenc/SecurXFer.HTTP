@@ -85,8 +85,6 @@ func main() {
 
 	go func() {
 
-		// http.HandleFunc("/", processor)
-		// Harici = <-gelenMesajKanal
 		err := http.ListenAndServe(":8888", nil)
 		if err != nil {
 			return

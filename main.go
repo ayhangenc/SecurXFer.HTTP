@@ -52,6 +52,7 @@ var (
 	temps  *template.Template
 	Harici = "Harici"
 
+	// msgQ = ""
 	// gelenMesajKanal = &DataPasser{msgX: make(chan string)}
 
 	gelenMesajKanal = make(chan string)
@@ -75,7 +76,7 @@ func handleConnection(conn net.Conn) (msg2serVer string) {
 	headSign := fullMessageReceived[:2] // check if message is authentic (header first 2-digits are FO:O0/01)
 	if headSign[0] == 0xf0 {
 		if headSign[1] == 0x00 || headSign[1] == 0x01 {
-			fmt.Println("Message Is Authentic.")
+			// fmt.Println("Message Is Authentic.")
 		} else {
 			fmt.Println("Message Is NOT Authentic!..")
 			return
@@ -104,7 +105,7 @@ func handleConnection(conn net.Conn) (msg2serVer string) {
 	var messageRXBody []byte
 	switch headSign[1] { // check if message is encrypted
 	case 0x01: // encrypted
-		fmt.Println("Message Is Encypted!...")
+		// fmt.Println("Message Is Encypted!...")
 		messageRXBodySTR, err := decryptMessage(cipherKey256, string(fullMessageReceived[8:]))
 
 		messageRXBody = []byte(messageRXBodySTR)
@@ -114,10 +115,10 @@ func handleConnection(conn net.Conn) (msg2serVer string) {
 			os.Exit(-3)
 		}
 	case 0x00: // not encrypted
-		fmt.Println("Message Is Not Encrypted!..")
+		// fmt.Println("Message Is Not Encrypted!..")
 		messageRXBody = fullMessageReceived[8:]
 	}
-	fmt.Printf("Message RECEIVED from other party (be it encrypted or not) : %s\n", messageRXBody)
+	// fmt.Printf("Message RECEIVED from other party (be it encrypted or not) : %s\n", messageRXBody)
 
 	return string(messageRXBody)
 }
@@ -254,23 +255,24 @@ func serVer(input chan<- string) {
 	tcpAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("127.0.0.1:%s", "4444"))
 	checkError(err)
 	fmt.Println("IP add: ", tcpAddr)
-	listener, err := net.ListenTCP("tcp", tcpAddr)
-	checkError(err)
+	listener, _ := net.ListenTCP("tcp", tcpAddr)
+	// checkError(err)
 
 	for {
-
+		// defer close(input)
 		connectTo, err := listener.Accept()
 		checkError(err)
 		msgserVer := handleConnection(connectTo)
-
-		Harici = msgserVer
+		fmt.Println("gelen mesaj ch öncesi: ", msgserVer)
 
 		input <- msgserVer
+		// fmt.Println("IP add: ", <-gelenMesajKanal)
+		// fmt.Println("IP add: ", <-gelenMesajKanal)
 
 	}
 }
 
-func cliEnt(input chan string) {
+func cliEnt(input <-chan string) {
 
 	/*
 		messageFromCLI := msg
@@ -317,9 +319,9 @@ func cliEnt(input chan string) {
 		checkError(err)
 		_, err = conn.Write(fullMessage2Send)
 		checkError(err)
-		fmt.Println("Message sent!...")
+		// fmt.Println("Message sent!...")
 
-		input <- inputMessage
+		// input <- inputMessage
 
 	}
 }
@@ -351,7 +353,7 @@ func checkError(err error) {
 func index(w http.ResponseWriter, r *http.Request) {
 
 	message2Send := r.FormValue("message")
-	protocol := r.FormValue("proto")
+
 	d := struct {
 		Message   string // Last  string
 		MessageRX string
@@ -366,13 +368,69 @@ func index(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Harici = <-gelenMesajKanal.msgX
-
-	fmt.Println("hello", message2Send)
-	fmt.Println("hello", protocol)
-	fmt.Println("Harici: ", Harici)
-
 	gidenMesajKanal <- message2Send
+
+}
+
+func wsroot(w http.ResponseWriter, r *http.Request) {
+
+	fmt.Fprintf(w, "Hello WebSocket, message from fell: %s", Harici)
+
+	/*
+		message2Send := r.FormValue("message")
+		protocol := r.FormValue("proto")
+		q := struct {
+			Message   string // Last  string
+			MessageRX string
+			MessageTX string
+		}{
+			Message:   message2Send, // Last:  lname,,
+			MessageRX: Harici,
+			MessageTX: message2Send,
+		}
+		err := temps.ExecuteTemplate(w, "index.templ", q)
+		if err != nil {
+			return
+		}
+
+		// Harici = <-gelenMesajKanal.msgX
+
+		fmt.Println("hello", message2Send)
+		fmt.Println("hello", protocol)
+		fmt.Println("Harici: ", Harici)
+
+		gidenMesajKanal <- message2Send
+
+	*/
+
+	/*
+
+		message2Send := r.FormValue("message")
+		protocol := r.FormValue("proto")
+		d := struct {
+			Message   string // Last  string
+			MessageRX string
+			MessageTX string
+		}{
+			Message:   message2Send, // Last:  lname,,
+			MessageRX: Harici,
+			MessageTX: message2Send,
+		}
+		err := temps.ExecuteTemplate(w, "index.templ", d)
+		if err != nil {
+			return
+		}
+
+		// Harici = <-gelenMesajKanal.msgX
+
+		fmt.Println("hello", message2Send)
+		fmt.Println("hello", protocol)
+		fmt.Println("Harici: ", Harici)
+
+
+		gidenMesajKanal <- message2Send
+
+	*/
 
 }
 
@@ -382,9 +440,12 @@ func main() {
 
 	go cliEnt(gidenMesajKanal)
 
+	go func() { http.HandleFunc("/", index) }()
+
+	go func() { http.HandleFunc("/ws", wsroot) }()
+
 	go func() {
 
-		http.HandleFunc("/", index)
 		// http.HandleFunc("/", processor)
 		// Harici = <-gelenMesajKanal
 		err := http.ListenAndServe(":8888", nil)
@@ -392,6 +453,8 @@ func main() {
 			return
 		}
 	}()
+
+	// msgQ = <-gelenMesajKanal
 
 	for {
 		// for i := 0; i < len(questions); i++ { --original line
@@ -401,18 +464,19 @@ func main() {
 
 		select {
 		case <-gelenMesajKanal:
-			// Harici = <-gelenMesajKanal
+			Harici = <-gelenMesajKanal
 			// if userAnswer == 1 {
-			fmt.Printf("Calling server!...%v\n", <-gelenMesajKanal)
 
-		// } else {
-		// fmt.Println("Wrong answer")
-		// }
-		// case <-time.After(5 * time.Second):
-		//	fmt.Println("\n Time is over!")
-		case <-gidenMesajKanal:
+			// fmt.Printf("Calling server!...%v\n", <-gelenMesajKanal)
+
+			// } else {
+			// fmt.Println("Wrong answer")
+			// }
+			// case <-time.After(5 * time.Second):
+			//	fmt.Println("\n Time is over!")
+			// case <-gidenMesajKanal:
 			// if userAnswer == 1 {
-			fmt.Printf("Calling client!...%v\n", <-gidenMesajKanal)
+			// fmt.Printf("Calling client!...%v\n", <-gidenMesajKanal)
 
 			// } else {
 			// fmt.Println("Wrong answer")
@@ -421,4 +485,5 @@ func main() {
 			//	fmt.Println("\n Time is over!")
 		}
 	}
+
 }

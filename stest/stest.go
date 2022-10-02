@@ -10,8 +10,8 @@ import (
 var (
 	temps           *template.Template
 	Harici          = "Harici"
-	gelenMesajKanal = make(chan string)
-	gidenMesajKanal = make(chan string)
+	gelenMesajKanal = make(chan string, 1)
+	gidenMesajKanal = make(chan string, 1)
 )
 
 func init() {
@@ -20,21 +20,21 @@ func init() {
 
 }
 
-func serVer(input chan<- string) {
+func serVer() {
 
 	tcpAddr, _ := net.ResolveTCPAddr("tcp", fmt.Sprintf("127.0.0.1:%s", "4444"))
 	fmt.Println("IP add: ", tcpAddr)
 	listener, _ := net.ListenTCP("tcp", tcpAddr)
 
 	for {
-		// defer close(input)
+
 		connectTo, _ := listener.Accept()
 		in := make([]byte, 1024)
 		nRead, _ := connectTo.Read(in[:])
 		msgIn := in[:nRead]
 		msgserVer := string(msgIn)
 		fmt.Println("Gelen Mesaj: ", msgserVer)
-		input <- msgserVer
+		gelenMesajKanal <- msgserVer
 	}
 }
 
@@ -47,7 +47,6 @@ func cliEnt(input <-chan string) {
 }
 
 func index(w http.ResponseWriter, r *http.Request) {
-
 	message2Send := r.FormValue("message")
 
 	d := struct {
@@ -61,41 +60,47 @@ func index(w http.ResponseWriter, r *http.Request) {
 	}
 	err := temps.ExecuteTemplate(w, "index.templ", d)
 	if err != nil {
-		return
+		fmt.Println("error:", err)
 	}
+	fmt.Println("giden mesaj: ", message2Send)
 	gidenMesajKanal <- message2Send
 
 }
 
-func wsroot(w http.ResponseWriter, r *http.Request) {
+func wsroot(w http.ResponseWriter, r *http.Request) { //OK...
 
 	fmt.Fprintf(w, "Hello WebSocket, message from fell: %s", Harici)
+	// OK... fmt.Println("Harici ws page: ", Harici)
 
 }
 
 func main() {
 
-	go serVer(gelenMesajKanal)
+	func() {
+		http.HandleFunc("/", index)
+	}()
+
+	func() {
+		http.HandleFunc("/ws", wsroot)
+	}()
+
+	go serVer()
 
 	go cliEnt(gidenMesajKanal)
-
-	go func() { http.HandleFunc("/", index) }()
-
-	go func() { http.HandleFunc("/ws", wsroot) }()
 
 	go func() {
 
 		err := http.ListenAndServe(":8888", nil)
 		if err != nil {
-			return
+			fmt.Println("error", err)
 		}
 	}()
 
 	for {
-		select {
-		case <-gelenMesajKanal:
-			Harici = <-gelenMesajKanal
-			fmt.Printf("Calling server!...%v\n", <-gelenMesajKanal)
-		}
+		// select {
+		// case <-gelenMesajKanal:
+		Harici = <-gelenMesajKanal
+		fmt.Printf("Calling server!...%v\n", Harici)
+		// }
 	}
 }

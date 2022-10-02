@@ -14,17 +14,66 @@
 
 <h1>SecurXFer / HTTP UI Edition v0.1</h1>
 
-<form action="/process" method="POST">
-    <label for="msg">Your Message</label>
-    <input type="text" name="message" id="msg" placeholder="Your Message">
 
-    <input type="submit" value="GÖNDER BE!">
-</form>
+<br>
 
-<h1>SecurXFer</h1>
+    <form class="my-form">
+        <input type="text" placeholder="Mesajınızı buraya yazın! " name="my-input">
+        <button>GÖNDER BE!</button>
+    </form>
 
-<h3>Gelen Mesaj: {{.MessageRX}}</h3>
-<h3>Giden Mesaj: {{.MessageTX}}</h3>
+
+<h3>Giden Mesaj: <label id = "FGF">
+                     MESAJ
+                 </label></h3>
+<h3>Gelen Mesaj: <label id = "GFG">
+                     BEKLEMEDE
+                  </label></h3>
+
+
+<script>
+
+        let socket = new WebSocket("ws://127.0.0.1:8888/ws");
+        console.log("Walla, Attempting Connection...");
+
+        socket.onopen = () => {
+        console.log("Successfully Connected");
+        };
+
+
+        let form = document.querySelector(".my-form");
+
+        form.addEventListener("submit", function (e) {
+            e.preventDefault() // This prevents the window from reloading
+
+            let formdata = new FormData(this);
+            let input = formdata.get("my-input");
+            document.getElementById('FGF').innerHTML = input;
+
+            console.log(input);
+            socket.send(input);
+        });
+
+        socket.onmessage = function(event) {
+                let server_message = event.data;
+                console.log(server_message);
+                document.getElementById('GFG').innerHTML = server_message;
+                };
+
+
+
+        socket.onclose = event => {
+            console.log("Socket Closed Connection: ", event);
+            socket.send("Client Closed!")
+        };
+
+        socket.onerror = error => {
+            console.log("Socket Error: ", error);
+        };
+
+
+
+</script>
 
 </body>
 

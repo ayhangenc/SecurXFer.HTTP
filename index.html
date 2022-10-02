@@ -1,0 +1,72 @@
+<html>
+<head>
+    <title>WebSockets with HTML5</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<div id="page-wrapper">
+    <h1>Example of WebSockets</h1>
+
+    <div id="status">Conecting to the app…</div>
+
+    <label id = "GFG">
+        Welcome to GeeksforGeeks
+    </label>
+
+    <br>
+
+
+
+    <ul id="messages"></ul>
+
+    <form class="my-form">
+        <input type="text" placeholder="Type " name="my-input">
+        <button>Get Value</button>
+    </form>
+
+</div>
+<script>
+
+    let socket = new WebSocket("ws://127.0.0.1:3000/v1/ws");
+    console.log("Walla, Attempting Connection...");
+
+    socket.onopen = () => {
+        console.log("Successfully Connected");
+        socket.send("opena, Hi From the Client!");
+    };
+
+
+    socket.onmessage = function(event) {
+        let server_message = event.data;
+        console.log(server_message);
+        document.getElementById('GFG').innerHTML = server_message;
+    };
+
+    let form = document.querySelector(".my-form");
+
+        form.addEventListener("submit", function (e) {
+            e.preventDefault() // This prevents the window from reloading
+
+            let formdata = new FormData(this);
+            let input = formdata.get("my-input");
+
+            console.log(input);
+            socket.send(input);
+        });
+
+        socket.onclose = event => {
+            console.log("Socket Closed Connection: ", event);
+            socket.send("Client Closed!")
+        };
+
+        socket.onerror = error => {
+            console.log("Socket Error: ", error);
+        };
+
+
+
+</script>
+</body>
+</html>

@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"github.com/gorilla/websocket"
 	"hash/crc32"
 	"html/template"
 	"io"
@@ -51,6 +52,7 @@ var (
 	//cipherKey128 = []byte("_08_bit__16_bit_") //16-bit key for AES-128
 	temps  *template.Template
 	Harici = "Harici"
+	Dahili = "Dahili"
 
 	// msgQ = ""
 	// gelenMesajKanal = &DataPasser{msgX: make(chan string)}
@@ -58,6 +60,8 @@ var (
 	gelenMesajKanal = make(chan string)
 
 	gidenMesajKanal = make(chan string)
+
+	upgrader = websocket.Upgrader{}
 )
 
 func init() {
@@ -250,7 +254,7 @@ func headerGenerate(message2Send []byte, crcfromMessage []byte, enc int) (header
 	return header
 }
 
-func serVer(input chan<- string) {
+func serVer() {
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("127.0.0.1:%s", "4444"))
 	checkError(err)
@@ -259,20 +263,19 @@ func serVer(input chan<- string) {
 	// checkError(err)
 
 	for {
-		// defer close(input)
 		connectTo, err := listener.Accept()
 		checkError(err)
 		msgserVer := handleConnection(connectTo)
 		fmt.Println("gelen mesaj ch öncesi: ", msgserVer)
 
-		input <- msgserVer
+		Harici = msgserVer
 		// fmt.Println("IP add: ", <-gelenMesajKanal)
 		// fmt.Println("IP add: ", <-gelenMesajKanal)
 
 	}
 }
 
-func cliEnt(input <-chan string) {
+func cliEnt(input chan string) {
 
 	/*
 		messageFromCLI := msg
@@ -346,10 +349,6 @@ func checkError(err error) {
 	}
 }
 
-// type DataPasser struct {
-// 	 msgX chan string
-// }
-
 func index(w http.ResponseWriter, r *http.Request) {
 
 	message2Send := r.FormValue("message")
@@ -368,122 +367,89 @@ func index(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gidenMesajKanal <- message2Send
+	// gidenMesajKanal <- message2Send
 
 }
 
 func wsroot(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Fprintf(w, "Hello WebSocket, message from fell: %s", Harici)
+	// fmt.Fprintf(w, "Hello WebSocket, message from fell: %s", Harici)
 
-	/*
-		message2Send := r.FormValue("message")
-		protocol := r.FormValue("proto")
-		q := struct {
-			Message   string // Last  string
-			MessageRX string
-			MessageTX string
-		}{
-			Message:   message2Send, // Last:  lname,,
-			MessageRX: Harici,
-			MessageTX: message2Send,
+	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+
+	var conn, _ = upgrader.Upgrade(w, r, nil)
+
+	go func(conn *websocket.Conn) {
+		{
+			for {
+				// fmt.Println(" ready to Reading socket ")
+				mType, msg, _ := conn.ReadMessage()
+
+				fmt.Printf("www ws den gelen mesaj: %s  \n", string(msg))
+
+				// k := []byte("ekmek")
+
+				Dahili = string(msg)
+
+				gidenMesajKanal <- string(msg)
+
+				// Harici = <-gelenMesajKanal
+
+				conn.WriteMessage(mType, []byte(Harici))
+
+				fmt.Printf("gelen mesaj to www: %s  \n", string(Harici))
+			}
 		}
-		err := temps.ExecuteTemplate(w, "index.templ", q)
-		if err != nil {
-			return
-		}
-
-		// Harici = <-gelenMesajKanal.msgX
-
-		fmt.Println("hello", message2Send)
-		fmt.Println("hello", protocol)
-		fmt.Println("Harici: ", Harici)
-
-		gidenMesajKanal <- message2Send
-
-	*/
-
-	/*
-
-		message2Send := r.FormValue("message")
-		protocol := r.FormValue("proto")
-		d := struct {
-			Message   string // Last  string
-			MessageRX string
-			MessageTX string
-		}{
-			Message:   message2Send, // Last:  lname,,
-			MessageRX: Harici,
-			MessageTX: message2Send,
-		}
-		err := temps.ExecuteTemplate(w, "index.templ", d)
-		if err != nil {
-			return
-		}
-
-		// Harici = <-gelenMesajKanal.msgX
-
-		fmt.Println("hello", message2Send)
-		fmt.Println("hello", protocol)
-		fmt.Println("Harici: ", Harici)
-
-
-		gidenMesajKanal <- message2Send
-
-	*/
+	}(conn)
 
 }
 
 func main() {
 
-	go serVer(gelenMesajKanal)
+	func() { http.HandleFunc("/", index) }()
+
+	func() { http.HandleFunc("/ws", wsroot) }()
+
+	go serVer()
 
 	go cliEnt(gidenMesajKanal)
 
-	go func() { http.HandleFunc("/", index) }()
+	func() {
 
-	go func() { http.HandleFunc("/ws", wsroot) }()
-
-	go func() {
-
-		// http.HandleFunc("/", processor)
-		// Harici = <-gelenMesajKanal
 		err := http.ListenAndServe(":8888", nil)
 		if err != nil {
 			return
 		}
 	}()
 
-	// msgQ = <-gelenMesajKanal
+	// for {
+	// for i := 0; i < len(questions); i++ { --original line
+	// fmt.Println("soru bu")
+	// fmt.Println(questions[i].Text)  --original line
+	// fmt.Print("mesajı girin ")
 
-	for {
-		// for i := 0; i < len(questions); i++ { --original line
-		// fmt.Println("soru bu")
-		// fmt.Println(questions[i].Text)  --original line
-		// fmt.Print("mesajı girin ")
+	// select {
+	// case <-gelenMesajKanal:
 
-		select {
-		case <-gelenMesajKanal:
-			Harici = <-gelenMesajKanal
-			// if userAnswer == 1 {
+	// if userAnswer == 1 {
 
-			// fmt.Printf("Calling server!...%v\n", <-gelenMesajKanal)
+	fmt.Printf("Calling server!...%v\n", Harici)
 
-			// } else {
-			// fmt.Println("Wrong answer")
-			// }
-			// case <-time.After(5 * time.Second):
-			//	fmt.Println("\n Time is over!")
-			// case <-gidenMesajKanal:
-			// if userAnswer == 1 {
-			// fmt.Printf("Calling client!...%v\n", <-gidenMesajKanal)
+	// } else {
+	// fmt.Println("Wrong answer")
+	// }
+	// case <-time.After(5 * time.Second):
+	//	fmt.Println("\n Time is over!")
+	// case <-gidenMesajKanal:
+	// if userAnswer == 1 {
+	// fmt.Printf("Calling client!...%v\n", <-gidenMesajKanal)
 
-			// } else {
-			// fmt.Println("Wrong answer")
-			// }
-			// case <-time.After(5 * time.Second):
-			//	fmt.Println("\n Time is over!")
-		}
-	}
+	// } else {
+	// fmt.Println("Wrong answer")
+	// }
+	// case <-time.After(5 * time.Second):
+	//	fmt.Println("\n Time is over!")
+	// }
+	// }
 
 }

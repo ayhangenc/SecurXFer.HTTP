@@ -22,18 +22,19 @@ import (
 	"net"
 	"net/http"
 	"os"
-	// "strings"
+	"os/exec"
+	"runtime"
 )
 
 /*
 *	FILE			: main.go
-*	PROJECT			: Secure Message Transfer - Client/Server
+*	PROJECT			: Secure Message Transfer - Point to point secure messaging with a web UI
 *	PROGRAMMER		: Ayhan GENC, ref: https://github.com/ayhangenc
 *	FIRST VERSION	: 19 Sept. 2022
 *	DESCRIPTION		:
 *		The project is a learning exercise for go. There would be different functions, including byte operations,
 *		CRC generation and checking, encryption/decryption and TCP/UDP comm. using the Golang standard libraries
-*		for AES(CFB), CRC etc...
+*		for AES(CFB), CRC, HTTP, websockets, web UI ...
 *		DISCLAIMER: This is only for my personal learning. So NO WARRANTIES....
 *		Credits: Daniel Pieczewski, ref: https://github.com/mickelsonm for AES encryption/decryption clues... .
 * 				 Kevin FOO , ref: https://oofnivek.medium.com for CRC-32 clues
@@ -55,33 +56,25 @@ var (
 	cipherKey256 = []byte("_08_bit__16_bit__24_bit__32_bit_") //32-bit key for AES-256
 	//cipherKey192 = []byte("_08_bit__16_bit__24_bit_") //24-bit key for AES-192
 	//cipherKey128 = []byte("_08_bit__16_bit_") //16-bit key for AES-128
-	temps  *template.Template
-	Harici = "Harici"
-	Dahili = "Dahili"
 
-	// msgQ = ""
-	// gelenMesajKanal = &DataPasser{msgX: make(chan string)}
-
-	gelenMesajKanal = make(chan string)
-
-	gidenMesajKanal = make(chan string)
-
-	upgrader = websocket.Upgrader{}
+	temps           *template.Template
+	gelenMesajKanal = make(chan string, 1)
+	gidenMesajKanal = make(chan string, 1)
+	upgrader        = websocket.Upgrader{}
+	err             error
 )
 
 func init() {
 
 	temps = template.Must(template.ParseGlob("./tmpl/*.templ"))
-
 }
 
 func handleConnection(conn net.Conn) (msg2serVer string) {
 
-	input := make([]byte, 1024)
+	input := make([]byte, 1024) // initialize the reception buffer for incoimg message
 	nRead, err := conn.Read(input[0:])
 	checkError(err)
 	fullMessageReceived := input[:nRead]
-
 	headSign := fullMessageReceived[:2] // check if message is authentic (header first 2-digits are FO:O0/01)
 	if headSign[0] == 0xf0 {
 		if headSign[1] == 0x00 || headSign[1] == 0x01 {
@@ -94,7 +87,6 @@ func handleConnection(conn net.Conn) (msg2serVer string) {
 		fmt.Println("Message Is NOT Authentic!..")
 		return
 	}
-
 	lenFromHeader := fullMessageReceived[6:8] // message lenght check (header digits 6 & 7 are lenght of message in hex)
 	lenFromMessage := len(fullMessageReceived) - 8
 	lenXCheck := int(lenFromHeader[0])*256 + int(lenFromHeader[1]) // (hex to int)
@@ -102,7 +94,6 @@ func handleConnection(conn net.Conn) (msg2serVer string) {
 		fmt.Println("Message size is DIFFERENT from header!...")
 		os.Exit(5) //message altered or corrupt during transmission
 	}
-
 	crcFromHeader := fullMessageReceived[2:6] // message crc check (header digits 2,3,4,5 are CRC digits in hex)
 	crcFromMessage := crcGenerate(fullMessageReceived[8:])
 	crcXCheck := bytes.Compare(crcFromHeader, crcFromMessage)
@@ -110,24 +101,17 @@ func handleConnection(conn net.Conn) (msg2serVer string) {
 		fmt.Println("Message CRC is DIFFERENT from header!...")
 		os.Exit(6) //message altered or corrupt during transmission
 	}
-
 	var messageRXBody []byte
 	switch headSign[1] { // check if message is encrypted
 	case 0x01: // encrypted
 		// fmt.Println("Message Is Encypted!...")
 		messageRXBodySTR, err := decryptMessage(cipherKey256, string(fullMessageReceived[8:]))
-
+		checkError(err) //if message decrypt fails...
 		messageRXBody = []byte(messageRXBodySTR)
-
-		if err != nil { //if message decrypt fails...
-			log.Println(err)
-			os.Exit(-3)
-		}
 	case 0x00: // not encrypted
 		// fmt.Println("Message Is Not Encrypted!..")
 		messageRXBody = fullMessageReceived[8:]
 	}
-	// fmt.Printf("Message RECEIVED from other party (be it encrypted or not) : %s\n", messageRXBody)
 
 	return string(messageRXBody)
 }
@@ -149,15 +133,11 @@ func handleConnection(conn net.Conn) (msg2serVer string) {
 func decryptMessage(cipherKey []byte, secureMessage string) (decodedMessage string, err error) {
 
 	cipherText, err := base64.RawStdEncoding.DecodeString(secureMessage) // decode base64
-	if err != nil {                                                      //IF DecodeString failed, exit:
-		return
-	}
+	checkError(err)
 	decryptionBlock, err := aes.NewCipher(cipherKey) //Create a new AES cipher with the key and encrypted message
-	if err != nil {                                  //IF NewCipher failed, exit:
-		return
-	}
+	checkError(err)
 	if len(cipherText) < aes.BlockSize { //IF the length of the cipherText is less than 16 Bytes:
-		log.Println("Ciphertext block size is too short!", err)
+		log.Println("Ciphertext block size is too short!")
 		os.Exit(-3)
 	}
 	intermediateText := cipherText[:aes.BlockSize]
@@ -221,6 +201,7 @@ func crcGenerate(message2CRC []byte) (crcFromMessage []byte) {
 	crcIntermediate := crc32.Checksum(message2CRC, crc32Table)
 	crcFromMessage = make([]byte, 4)
 	binary.BigEndian.PutUint16(crcFromMessage, uint16(crcIntermediate))
+
 	return crcFromMessage
 }
 
@@ -264,54 +245,27 @@ func serVer() {
 	tcpAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("127.0.0.1:%s", "4444"))
 	checkError(err)
 	fmt.Println("IP add: ", tcpAddr)
-	listener, _ := net.ListenTCP("tcp", tcpAddr)
-	// checkError(err)
+	listener, err := net.ListenTCP("tcp", tcpAddr)
+	checkError(err)
 
 	for {
 		connectTo, err := listener.Accept()
 		checkError(err)
 		msgserVer := handleConnection(connectTo)
-		fmt.Println("gelen mesaj ch öncesi: ", msgserVer)
-
-		// Harici = msgserVer
-
+		fmt.Println("gelen mesaj: ", msgserVer)
 		gelenMesajKanal <- msgserVer
-
-		// fmt.Println("IP add: ", <-gelenMesajKanal)
-		// fmt.Println("IP add: ", <-gelenMesajKanal)
-
 	}
 }
 
 func cliEnt(input chan string) {
 
-	/*
-		messageFromCLI := msg
-		inputMessage := ""
-		if messageFromCLI == "" {
-			messageReader := bufio.NewReader(os.Stdin)
-			fmt.Print("Please type your message here: ")
-			inputMessage, _ = messageReader.ReadString('\n')
-			inputMessage = strings.TrimSuffix(inputMessage, "\n") // remove CR from end
-		} else {
-			inputMessage = messageFromCLI
-		}
-
-	*/
 	for {
 		var inputMessage string
-		// fmt.Print("Gönderilecek Mesajı Giriniz: ")
-		// _, err := fmt.Scanf("%s\n", &inputMessage)
-		// if err != nil {
-		// 	panic(err)
-		// }
-		// inputMessage = strings.TrimSuffix(inputMessage, "\n") // remove CR from end
 		inputMessage = <-input
 		var messagetoCRC []byte
 		// switch enc {
 		// case 0: // no encryption
 		// 	messagetoCRC = []byte(inputMessage)
-
 		// case 1: //encrypt the message
 		encrypted, err := encryptMessage(cipherKey256, inputMessage)
 		if err != nil { //IF the encryption failed:
@@ -319,7 +273,6 @@ func cliEnt(input chan string) {
 			os.Exit(-3)      // -3: Encryption error
 		}
 		messagetoCRC = []byte(encrypted)
-
 		messageCRC := crcGenerate(messagetoCRC)                      // CRC Generation
 		messageHeader := headerGenerate(messagetoCRC, messageCRC, 1) // &enc) // Header Generation
 		fullMessage2Send := append(messageHeader[:], messagetoCRC[:]...)
@@ -330,97 +283,65 @@ func cliEnt(input chan string) {
 		checkError(err)
 		_, err = conn.Write(fullMessage2Send)
 		checkError(err)
-		// fmt.Println("Message sent!...")
-
-		// input <- inputMessage
-
 	}
 }
 
-/*
-*	FILE			: main.go
-*	PROJECT			: Secure Message Transfer - Client/Server
-*	PROGRAMMER		: Ayhan GENC, ref: https://github.com/ayhangenc
-*	FIRST VERSION	: 19 Sept. 2022
-*	DESCRIPTION		:
-*		The project is a learning exercise for go. There would be different functions, including byte operations,
-*		CRC generation and checking, encryption/decryption and TCP/UDP comm. using the Golang standard libraries
-*		for AES(CFB), CRC etc...
-*		DISCLAIMER: This is only for my personal learning. So NO WARRANTIES....
-*		Credits: Daniel Pieczewski, ref: https://github.com/mickelsonm for AES encryption/decryption clues... .
-* 				 Kevin FOO , ref: https://oofnivek.medium.com for CRC-32 clues
- */
+func index(w http.ResponseWriter, _ *http.Request) {
 
-func checkError(err error) {
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func index(w http.ResponseWriter, r *http.Request) {
-
-	message2Send := r.FormValue("message")
-
-	d := struct {
-		Message   string // Last  string
-		MessageRX string
-		MessageTX string
-	}{
-		Message:   message2Send, // Last:  lname,,
-		MessageRX: Harici,
-		MessageTX: message2Send,
-	}
-	err := temps.ExecuteTemplate(w, "index.templ", d)
-	if err != nil {
-		return
-	}
-
-	// gidenMesajKanal <- message2Send
-
+	err = temps.ExecuteTemplate(w, "index.templ", nil)
+	checkError(err)
 }
 
 func wsroot(w http.ResponseWriter, r *http.Request) {
 
-	// fmt.Fprintf(w, "Hello WebSocket, message from fell: %s", Harici)
-
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
-
 	var conn, _ = upgrader.Upgrade(w, r, nil)
-
 	go func(conn *websocket.Conn) {
-
 		for {
-			// fmt.Println(" ready to Reading socket ")
-			_, msg, _ := conn.ReadMessage()
-
-			fmt.Printf("www ws den gelen mesaj: %s  \n", string(msg))
-
-			// k := []byte("ekmek")
-
-			Dahili = string(msg)
-
+			_, msg, err := conn.ReadMessage()
+			checkError(err)
+			fmt.Printf("giden mesaj: %s  \n", string(msg))
 			gidenMesajKanal <- string(msg)
-
-			// Harici = <-gelenMesajKanal
-
 		}
-
 	}(conn)
-
-	go func(c2 *websocket.Conn) {
-
+	go func(conn *websocket.Conn) {
 		for {
 			mesaj := <-gelenMesajKanal
-			c2.WriteMessage(1, []byte(mesaj))
-
-			fmt.Printf("gelen mesaj to www: %s  \n", string(mesaj))
+			err := conn.WriteMessage(1, []byte(mesaj))
+			checkError(err)
 		}
-
 	}(conn)
+}
+
+func openbrowser(url string) {
+	var err error
+
+	switch runtime.GOOS {
+	case "linux":
+		err = exec.Command("xdg-open", url).Start()
+	case "windows":
+		err = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+	case "darwin":
+		err = exec.Command("open", url).Start()
+	default:
+		err = fmt.Errorf("unsupported platform")
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
 
 }
 
+func checkError(err error) {
+
+	if err != nil {
+		log.Fatal("Error Occured: ", err, "Program Terminated!...")
+	}
+}
+
 func main() {
+
+	openbrowser("http://127.0.0.1:8888")
 
 	func() { http.HandleFunc("/", index) }()
 
@@ -437,35 +358,4 @@ func main() {
 			return
 		}
 	}()
-
-	// for {
-	// for i := 0; i < len(questions); i++ { --original line
-	// fmt.Println("soru bu")
-	// fmt.Println(questions[i].Text)  --original line
-	// fmt.Print("mesajı girin ")
-
-	// select {
-	// case <-gelenMesajKanal:
-
-	// if userAnswer == 1 {
-
-	fmt.Printf("Calling server!...%v\n", Harici)
-
-	// } else {
-	// fmt.Println("Wrong answer")
-	// }
-	// case <-time.After(5 * time.Second):
-	//	fmt.Println("\n Time is over!")
-	// case <-gidenMesajKanal:
-	// if userAnswer == 1 {
-	// fmt.Printf("Calling client!...%v\n", <-gidenMesajKanal)
-
-	// } else {
-	// fmt.Println("Wrong answer")
-	// }
-	// case <-time.After(5 * time.Second):
-	//	fmt.Println("\n Time is over!")
-	// }
-	// }
-
 }

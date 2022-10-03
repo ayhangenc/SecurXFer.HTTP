@@ -1,5 +1,10 @@
 package main
 
+// functionel olarak çalışan ilk kopya 3.10.2022 saat:10:38
+// error handling çalışması yapmak lazım, şu anda web client kapatılınca hataya düşüyor...
+// belki bir kapama butonu ekleyebiliriz....
+// verisyonu 0.5 yapalım....
+
 import (
 	"bytes"
 	"crypto/aes"
@@ -268,7 +273,10 @@ func serVer() {
 		msgserVer := handleConnection(connectTo)
 		fmt.Println("gelen mesaj ch öncesi: ", msgserVer)
 
-		Harici = msgserVer
+		// Harici = msgserVer
+
+		gelenMesajKanal <- msgserVer
+
 		// fmt.Println("IP add: ", <-gelenMesajKanal)
 		// fmt.Println("IP add: ", <-gelenMesajKanal)
 
@@ -380,26 +388,34 @@ func wsroot(w http.ResponseWriter, r *http.Request) {
 	var conn, _ = upgrader.Upgrade(w, r, nil)
 
 	go func(conn *websocket.Conn) {
-		{
-			for {
-				// fmt.Println(" ready to Reading socket ")
-				mType, msg, _ := conn.ReadMessage()
 
-				fmt.Printf("www ws den gelen mesaj: %s  \n", string(msg))
+		for {
+			// fmt.Println(" ready to Reading socket ")
+			_, msg, _ := conn.ReadMessage()
 
-				// k := []byte("ekmek")
+			fmt.Printf("www ws den gelen mesaj: %s  \n", string(msg))
 
-				Dahili = string(msg)
+			// k := []byte("ekmek")
 
-				gidenMesajKanal <- string(msg)
+			Dahili = string(msg)
 
-				// Harici = <-gelenMesajKanal
+			gidenMesajKanal <- string(msg)
 
-				conn.WriteMessage(mType, []byte(Harici))
+			// Harici = <-gelenMesajKanal
 
-				fmt.Printf("gelen mesaj to www: %s  \n", string(Harici))
-			}
 		}
+
+	}(conn)
+
+	go func(c2 *websocket.Conn) {
+
+		for {
+			mesaj := <-gelenMesajKanal
+			c2.WriteMessage(1, []byte(mesaj))
+
+			fmt.Printf("gelen mesaj to www: %s  \n", string(mesaj))
+		}
+
 	}(conn)
 
 }

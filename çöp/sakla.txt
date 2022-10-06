@@ -1,0 +1,57 @@
+index.html
+1. satırdan: <!DOCTYPE html>
+
+scripting
+
+socket.onmessage = function(event) {
+        let server_message = event.data;
+        console.log(server_message);
+        document.getElementById('GFG').innerHTML = server_message;
+        };
+
+        while(1) {
+            function msgFunc(event) {
+                    let server_message = event.data;
+                    console.log(server_message);
+                    document.getElementById('GFG').innerHTML = server_message;
+
+            };
+        };
+
+         socket.addEventListener('message', (event) => {
+                    console.log('Message from server ', event.data);
+                });
+
+
+
+
+bu da var...
+
+document.getElementById('ipadres').innerHTML = ipadresInput;
+                    console.log(ipadresInput);
+                    document.getElementById('remoteport').innerHTML = remoteportInput;
+                    console.log(remoteportInput);
+                    document.getElementById('localport').innerHTML = localportInput;
+                    console.log(localportInput);
+                    document.getElementById('enc').innerHTML = enc;
+                    console.log(enc);
+
+
+
+                    form.addEventListener("submit", function (e) {
+                                        e.preventDefault() // This prevents the window from reloading
+
+                                        let cFormdata = new FormData(this);
+                                        let userInput = cFormdata.get("cForm");
+                                        document.getElementById('user').innerHTML = userInput;
+                                        console.log(userInput);
+
+
+                                    });
+
+
+
+
+
+<label for="enc"> şifreleme etkin</label><br>
+input type="checkbox" name="vehicle1" value="Bike"><br>

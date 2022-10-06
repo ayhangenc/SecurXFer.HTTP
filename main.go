@@ -292,6 +292,12 @@ func index(w http.ResponseWriter, _ *http.Request) {
 	checkError(err)
 }
 
+func initWS(w http.ResponseWriter, _ *http.Request) {
+
+	err = temps.ExecuteTemplate(w, "init.templ", nil)
+	checkError(err)
+}
+
 func wsroot(w http.ResponseWriter, r *http.Request) {
 
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
@@ -310,6 +316,29 @@ func wsroot(w http.ResponseWriter, r *http.Request) {
 			err := conn.WriteMessage(1, []byte(mesaj))
 			checkError(err)
 		}
+	}(conn)
+}
+
+func wsInit(w http.ResponseWriter, r *http.Request) {
+
+	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+	var conn, _ = upgrader.Upgrade(w, r, nil)
+	func(conn *websocket.Conn) {
+
+		_, msg, err := conn.ReadMessage()
+		checkError(err)
+
+		userName := string(msg)
+		fmt.Printf("user name given: %s  \n", userName)
+
+	}(conn)
+	func(conn *websocket.Conn) {
+
+		mesaj := "http://127.0.0.1:8888/messaging"
+		err := conn.WriteMessage(1, []byte(mesaj))
+		checkError(err)
+		fmt.Printf("user OK msg sent: %s  \n", mesaj)
+
 	}(conn)
 }
 
@@ -341,9 +370,13 @@ func checkError(err error) {
 
 func main() {
 
-	openbrowser("http://127.0.0.1:8888")
+	openbrowser("http://127.0.0.1:8888/")
 
-	func() { http.HandleFunc("/", index) }()
+	func() { http.HandleFunc("/", initWS) }()
+
+	func() { http.HandleFunc("/wsLogin", wsInit) }()
+
+	func() { http.HandleFunc("/messaging", index) }()
 
 	func() { http.HandleFunc("/ws", wsroot) }()
 

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="eng">
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0,
+    maximum-scale=1.0, minimum-scale=1.0">
+    <title>SecurXFer v0.1 </title>
+
+</head>
+
+<body>
+
+<h1>SecurXFer / HTTP UI Edition v0.1</h1>
+
+<br>
+    <form class="cForm">
+        <form id="configForm">
+        <label for="user"> user name </label>
+        <input type="text" id="user" placeholder="kullanıcı adınızı buraya yazın! " name="username-input"><br>
+        <label for="ipAdd"> karşı tarafın ip adresi </label>
+        <input type="text" id="ipAdd" placeholder="karşı tarafın ip adresini buraya yazın! " name="ipAdd-input"><br>
+        <label for="enc"> şifreleme etkin</label>
+        <input type="checkbox" name="enc-input" value="1" checked><br>
+        <button>AYARLA!</button>
+    </form>
+
+
+<script>
+
+        let socket = new WebSocket("ws://127.0.0.1:8888/wsLogin");
+        console.log("Attempting Connection...");
+
+        socket.onopen = () => {
+        console.log("Successfully Connected");
+        };
+
+
+        let configForm = document.querySelector(".cForm");
+
+        configForm.addEventListener("submit", function (e) {
+            e.preventDefault() // This prevents the window from reloading
+            let cFormdata       = new FormData(configForm);
+            let userInput       = cFormdata.get("username-input");
+            let ipAddInput      = cFormdata.get("ipAdd-input");
+            let encInput        = cFormdata.get("enc-input");
+
+            console.log(userInput);
+            console.log(ipAddInput);
+            console.log(encInput);
+
+            socket.send(userInput);
+            sessionStorage.setItem('userID', userInput);
+        });
+
+        socket.onmessage = function(event) {
+                let server_message = event.data;
+                console.log(server_message);
+                socket.close
+                window.location.assign(server_message)
+                };
+
+        socket.onclose = event => {
+            console.log("Socket Closed Connection: ", event);
+            socket.send("Client Closed!")
+        };
+
+        socket.onerror = error => {
+            console.log("Socket Error: ", error);
+        };
+
+
+
+</script>
+
+</body>
+
+</html>

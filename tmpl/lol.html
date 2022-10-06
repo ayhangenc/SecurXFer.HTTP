@@ -1,0 +1,102 @@
+
+<!doctype html>
+<html lang="eng">
+<head>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0,
+    maximum-scale=1.0, minimum-scale=1.0">
+  <title>SecurXFer v0.1 </title>
+
+</head>
+
+<body>
+
+<h1>SecurXFer / HTTP UI Edition v0.1</h1>
+
+<br>
+<form class="cForm">
+  <form id="configForm">
+    <label for="user"> user name </label>
+    <input type="text" id="user" placeholder="kullanıcı adınızı buraya yazın! " name="username-input">
+    <button>AYARLA!</button>
+  </form>
+
+</form>
+  <br>
+
+
+  <form class="my-form">
+    <form id="messageForm">
+      <input type="text" placeholder="Mesajınızı buraya yazın! " name="my-input">
+      <button>GÖNDER BE!</button>
+    </form>
+  </form>
+    <br>
+
+    <h3>Giden Mesaj: <label id = "FGF">
+      MESAJ
+    </label></h3>
+    <h3>Gelen Mesaj: <label id = "GFG">
+      BEKLEMEDE
+    </label></h3>
+
+
+    <script>
+
+      let socket = new WebSocket("ws://127.0.0.1:8888/ws");
+      console.log("Walla, Attempting Connection...");
+
+      socket.onopen = () => {
+        console.log("ses Successfully Connected");
+      };
+
+
+      let configForm = document.querySelector(".cForm");
+
+      let form = document.querySelector(".my-form");
+
+      form.addEventListener("submit", function (e) {
+        e.preventDefault() // This prevents the window from reloading
+        let cFormdata = new FormData(configForm);
+        let userInput = cFormdata.get("username-input");
+
+        console.log(input);
+      });
+
+
+      form.addEventListener("submit", function (e) {
+        e.preventDefault() // This prevents the window from reloading
+
+        let formdata = new FormData(this);
+        let input = formdata.get("my-input");
+        document.getElementById('FGF').innerHTML = input;
+
+        console.log(input);
+        socket.send(input);
+      });
+
+      socket.onmessage = function(event) {
+        let server_message = event.data;
+        console.log(server_message);
+        document.getElementById('GFG').innerHTML = server_message;
+      };
+
+
+
+      socket.onclose = event => {
+        console.log("Socket Closed Connection: ", event);
+        socket.send("Client Closed!")
+      };
+
+      socket.onerror = error => {
+        console.log("Socket Error: ", error);
+      };
+
+
+
+    </script>
+
+</body>
+
+</html>
